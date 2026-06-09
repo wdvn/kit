@@ -32,10 +32,16 @@ type Config struct {
 
 	// BusyTimeout sets the busy timeout in milliseconds (default: 5000).
 	BusyTimeout int
+
+	// TTL configures MongoDB-style TTL indexes for automatic document expiration.
+	// When set, the TTL plugin is registered and a background worker is started.
+	// The plugin instance is returned via the second return value of Open/MustOpen.
+	TTL *TTLConfig
 }
 
 // Open creates a new GORM DB connection to an SQLite database using pure Go driver.
-func Open(cfg Config) (*gorm.DB, error) {
+// If cfg.TTL is set, the TTL plugin is registered and returned as the second value.
+func Open(cfg Config) (*gorm.DB, *TTLPlugin, error) {
 	dsn := buildDSN(cfg)
 
 	gormCfg := &gorm.Config{}
@@ -55,7 +61,7 @@ func Open(cfg Config) (*gorm.DB, error) {
 
 	db, err := gorm.Open(sqlite.Open(dsn), gormCfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open sqlite db: %w", err)
+		return nil, nil, fmt.Errorf("failed to open sqlite db: %w", err)
 	}
 
 	// Apply pragmas
@@ -74,21 +80,31 @@ func Open(cfg Config) (*gorm.DB, error) {
 	// Run auto-migration
 	if len(cfg.AutoMigrate) > 0 {
 		if err := db.AutoMigrate(cfg.AutoMigrate...); err != nil {
-			return nil, fmt.Errorf("failed to auto-migrate: %w", err)
+			return nil, nil, fmt.Errorf("failed to auto-migrate: %w", err)
+		}
+	}
+
+	// Register TTL plugin if configured
+	var ttlPlugin *TTLPlugin
+	if cfg.TTL != nil {
+		ttlPlugin = &TTLPlugin{config: *cfg.TTL}
+		if err := db.Use(ttlPlugin); err != nil {
+			return nil, nil, fmt.Errorf("failed to register ttl plugin: %w", err)
 		}
 	}
 
 	slog.Info("sqlite: connected", "path", cfg.Path)
-	return db, nil
+	return db, ttlPlugin, nil
 }
 
 // MustOpen is like Open but panics on error.
-func MustOpen(cfg Config) *gorm.DB {
-	db, err := Open(cfg)
+// If cfg.TTL is set, the TTL plugin is returned as the second value.
+func MustOpen(cfg Config) (*gorm.DB, *TTLPlugin) {
+	db, ttl, err := Open(cfg)
 	if err != nil {
 		panic(err)
 	}
-	return db
+	return db, ttl
 }
 
 // buildDSN constructs the SQLite connection string.

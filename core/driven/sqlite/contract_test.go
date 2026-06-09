@@ -97,7 +97,7 @@ type UserRepo struct {
 }
 
 func TestBindRepository(t *testing.T) {
-	db := driven.MustOpen(driven.Config{
+	db, _ := driven.MustOpen(driven.Config{
 		Path:        ":memory:",
 		AutoMigrate: []any{&User{}},
 		LogLevel:    3,
@@ -229,7 +229,7 @@ func TestBindRepository(t *testing.T) {
 // --- Test Handler function directly ---
 
 func TestHandlerDirect(t *testing.T) {
-	db := driven.MustOpen(driven.Config{
+	db, _ := driven.MustOpen(driven.Config{
 		Path:        ":memory:",
 		AutoMigrate: []any{&User{}},
 		LogLevel:    3,
