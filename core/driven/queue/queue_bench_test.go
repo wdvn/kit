@@ -83,14 +83,11 @@ func BenchmarkQueue_WorkerPop(b *testing.B) {
 	defer qm.Stop()
 
 	ctx := context.Background()
-	// Pre-fill queue with jobs
-	for i := 0; i < b.N; i++ {
-		_, _ = qm.Enqueue(ctx, "pop_queue", "task", i)
-	}
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
+			_, _ = qm.Enqueue(ctx, "pop_queue", "task", "payload")
 			_, _ = qm.popNextJob(ctx, "pop_queue", 30*time.Second)
 		}
 	})
