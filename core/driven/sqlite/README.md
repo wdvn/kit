@@ -77,3 +77,4 @@ Operations are inferred from method/field name prefixes:
 - `Delete*`, `Remove*`, `Drop*` -> **Delete**
 - `Count*` -> **Count**
 - `Exec*`, `Raw*` -> **Raw SQL**
+

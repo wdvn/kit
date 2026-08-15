@@ -110,7 +110,7 @@ func MustOpen(cfg Config) (*gorm.DB, *TTLPlugin) {
 // buildDSN constructs the SQLite connection string.
 func buildDSN(cfg Config) string {
 	if cfg.Path == ":memory:" {
-		return ":memory:?_pragma=foreign_keys(1)"
+		return "file::memory:?cache=shared&_pragma=foreign_keys(1)"
 	}
 
 	if cfg.Path == "" {
