@@ -2,6 +2,7 @@ package weed
 
 import (
 	"log/slog"
+	"os"
 
 	"github.com/wdvn/kit/core/abstract"
 	"github.com/wdvn/weed"
@@ -35,8 +36,19 @@ func New() *App {
 	logger := slog.Default()
 	store.Set("logger", logger)
 	return &App{
-		store:      store,
-		logger:     logger,
-		components: []abstract.Spark{},
+		store:       store,
+		logger:      logger,
+		components:  []abstract.Spark{},
+		ch:          make(chan error, 16),
+		signals:     defaultSignals,
+		StopTimeout: defaultStopTimeout,
 	}
+}
+
+// WithSignals overrides the termination signals the app listens for. Useful in
+// tests (to drive a stop without killing the test process) and for daemons that
+// want to react to SIGHUP as well.
+func (app *App) WithSignals(sigs ...os.Signal) *App {
+	app.signals = sigs
+	return app
 }

@@ -113,6 +113,9 @@ type QueueManager struct {
 
 	stopCh chan struct{}
 	wg     sync.WaitGroup
+
+	stopOnce sync.Once
+	stopDone sync.WaitGroup
 }
 
 type workerPool struct {
@@ -152,6 +155,7 @@ func New(db *gorm.DB, cfg ...Config) (*QueueManager, error) {
 		config: c,
 		stopCh: make(chan struct{}),
 	}
+	qm.stopDone.Add(1)
 
 	// Start background stalled job housekeeper
 	qm.wg.Add(1)
@@ -390,11 +394,26 @@ func (q *QueueManager) UpdateProgress(ctx context.Context, id string, progress i
 }
 
 // Stop gracefully stops all workers and background housekeeping routines.
+//
+// It is idempotent: the app calls it during shutdown, and callers commonly also
+// have `defer qm.Stop()`. A second call returns immediately instead of closing
+// an already-closed channel (which panics).
 func (q *QueueManager) Stop() {
-	if q.stopCh != nil {
-		close(q.stopCh)
-		q.stopCh = nil
-	}
+	q.stopOnce.Do(q.stop)
+
+	// Wait outside the Once so concurrent callers all block until the workers
+	// have actually finished, while the teardown itself runs exactly once.
+	q.stopDone.Wait()
+}
+
+func (q *QueueManager) stop() {
+	defer q.stopDone.Done()
+
+	// Never nil out stopCh: the housekeeper re-reads this field on every loop
+	// iteration, so setting it to nil lets it evaluate `case <-nil`, which
+	// blocks forever and makes Stop hang on q.wg.Wait(). Closing once (guarded
+	// by stopOnce) is enough for a closed channel to stay permanently ready.
+	close(q.stopCh)
 
 	q.workers.Range(func(key, value any) bool {
 		pool := value.(*workerPool)
